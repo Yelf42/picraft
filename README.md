@@ -24,6 +24,16 @@ Encodings are strings that represent the solution in hexidecimal. </br>
 Creates a copy of the last nonogram created </br>
 Very fast, ideal for repeating a `buildRandom` for competitions etc </br>
 
+``/picraft:remove dimension x y z``</br>
+Removes any placement at the location </br>
+Can also remove any entities that remain if something went wrong </br>
+
+``/picraft:forceSolve dimension x y z``</br>
+Solve the placement at the location </br>
+Solves according to the encoding, so will work on multi-solution problems </br>
+Locks you from modifying the nonogram afterward, akin to giving up </br>
+
+
 
 ## Credits
 [Nonogram-Maker by kniffen](https://github.com/kniffen/Nonogram-Maker?tab=readme-ov-file)

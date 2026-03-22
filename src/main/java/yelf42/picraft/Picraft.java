@@ -12,6 +12,9 @@ import io.papermc.paper.command.brigadier.argument.resolvers.BlockPositionResolv
 import io.papermc.paper.math.BlockPosition;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -51,6 +54,7 @@ public final class Picraft extends JavaPlugin {
     public boolean checkPlacementOverlap(BoundingBox bb, World world) {
         return activePlacements.stream().anyMatch((crosswordPlacement -> crosswordPlacement.overlappingBoundingBox(bb, world)));
     }
+
 
     @Override
     public void onEnable() {
@@ -135,7 +139,11 @@ public final class Picraft extends JavaPlugin {
                                                             activePlacements.add(placement);
                                                             placement.startTicking(this);
                                                             placement.generate();
-                                                            sender.sendMessage(Component.text("Puzzle ready! Encoding: " + encoding));
+                                                            sender.sendMessage(Component.text("Puzzle ready! Encoding: ")
+                                                                    .append(Component.text(encoding)
+                                                                            .clickEvent(ClickEvent.copyToClipboard(encoding))
+                                                                            .hoverEvent(HoverEvent.showText(Component.text("Click to copy")))
+                                                                            .color(NamedTextColor.YELLOW)));
                                                         });
                                                     });
 
@@ -173,7 +181,11 @@ public final class Picraft extends JavaPlugin {
                                                             activePlacements.add(placement);
                                                             placement.startTicking(this);
                                                             placement.generate();
-                                                            sender.sendMessage(Component.text("Puzzle ready! Encoding: " + encoding));
+                                                            sender.sendMessage(Component.text("Puzzle ready! Encoding: ")
+                                                                    .append(Component.text(encoding)
+                                                                            .clickEvent(ClickEvent.copyToClipboard(encoding))
+                                                                            .hoverEvent(HoverEvent.showText(Component.text("Click to copy")))
+                                                                            .color(NamedTextColor.YELLOW)));
                                                         });
                                                     });
 
@@ -216,7 +228,11 @@ public final class Picraft extends JavaPlugin {
                                                             activePlacements.add(placement);
                                                             placement.startTicking(this);
                                                             placement.generate();
-                                                            sender.sendMessage(Component.text("Puzzle ready! Encoding: " + encoding));
+                                                            sender.sendMessage(Component.text("Puzzle ready! Encoding: ")
+                                                                    .append(Component.text(encoding)
+                                                                            .clickEvent(ClickEvent.copyToClipboard(encoding))
+                                                                            .hoverEvent(HoverEvent.showText(Component.text("Click to copy")))
+                                                                            .color(NamedTextColor.YELLOW)));
                                                         });
                                                     });
 
@@ -256,12 +272,39 @@ public final class Picraft extends JavaPlugin {
                                                             activePlacements.add(placement);
                                                             placement.startTicking(this);
                                                             placement.generate();
-                                                            sender.sendMessage(Component.text("Puzzle ready! Encoding: " + encoding));
+                                                            sender.sendMessage(Component.text("Puzzle ready! Encoding: ")
+                                                                    .append(Component.text(encoding)
+                                                                            .clickEvent(ClickEvent.copyToClipboard(encoding))
+                                                                            .hoverEvent(HoverEvent.showText(Component.text("Click to copy")))
+                                                                            .color(NamedTextColor.YELLOW)));
                                                         });
                                                     });
 
                                                     return Command.SINGLE_SUCCESS;
                                                 })))
+                .build();
+
+        LiteralCommandNode<CommandSourceStack> forceSolve = Commands.literal("forceSolve").requires(sender -> sender.getSender().isOp())
+                .then(Commands.argument("dimension", ArgumentTypes.world())
+                        .then(Commands.argument("pos", ArgumentTypes.blockPosition())
+                                .executes(ctx -> {
+                                    CommandSender sender = ctx.getSource().getSender();
+
+                                    World world = ctx.getArgument("dimension", World.class);
+                                    BlockPositionResolver posResolver = ctx.getArgument("pos", BlockPositionResolver.class);
+                                    BlockPosition position = posResolver.resolve(ctx.getSource());
+                                    Location location = new Location(world, position.x(), position.y(), position.z());
+
+                                    Picross placement = withinPlacement(location);
+                                    if (placement == null) {
+                                        sender.sendMessage(Component.text("No nonogram present, cancelling solve"));
+                                        return Command.SINGLE_SUCCESS;
+                                    }
+
+                                    placement.forceSolve();
+
+                                    return Command.SINGLE_SUCCESS;
+                                })))
                 .build();
 
         this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, commands -> {
@@ -270,6 +313,7 @@ public final class Picraft extends JavaPlugin {
             commands.registrar().register(buildRandom);
             commands.registrar().register(buildExisting);
             commands.registrar().register(buildRepeat);
+            commands.registrar().register(forceSolve);
         });
     }
 

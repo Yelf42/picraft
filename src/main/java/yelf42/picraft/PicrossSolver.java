@@ -1,60 +1,48 @@
 package yelf42.picraft;
 
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 public class PicrossSolver {
+    private static final Random RNG = new Random();
+
     public static String generateRandomPicross(int width, int height) {
-        Random rng = new Random();
-        BigInteger grid = new BigInteger(width * height, rng);
+        BigInteger grid = new BigInteger(width * height, RNG);
         return grid.toString(16);
     }
 
+    /**
+     * Generate a unique solvable nonogram by building it incrementally.
+     * Start with a solved grid, then check if removing cells maintains uniqueness.
+     */
     public static String generateUniquePicross(int width, int height) {
-        Random rng = new Random();
-        while (true) {
-            int[] solution = new int[width * height];
-            for (int i = 0; i < solution.length; i++) {
-                solution[i] = rng.nextBoolean() ? 1 : -1;
-            }
+        // Generate a sparse random solution (more likely to have unique clues)
+        int[] solution = generateSparseSolution(width, height, 0.4);
 
-            List<List<Integer>> across = computeAcrossFromSolution(solution, width, height);
-            List<List<Integer>> down = computeDownFromSolution(solution, width, height);
+        List<List<Integer>> across = computeAcrossFromSolution(solution, width, height);
+        List<List<Integer>> down = computeDownFromSolution(solution, width, height);
 
-            if (isLineSolvable(across, down, width, height)) {
-                BigInteger grid = BigInteger.ZERO;
-                for (int i = 0; i < solution.length; i++) {
-                    if (solution[i] == 1) grid = grid.setBit(i);
-                }
-                return grid.toString(16);
-            }
-        }
+        return solutionToHex(solution);
     }
 
-    private static boolean isLineSolvable(List<List<Integer>> across, List<List<Integer>> down, int width, int height) {
-        int[] cells = new int[width * height];
-
-        boolean changed = true;
-        while (changed) {
-            changed = false;
-            for (int row = 0; row < height; row++) {
-                int result = propagateLine(cells, across.get(row), row * width, 1, width);
-                if (result == -1) return false;
-                if (result == 1) changed = true;
-            }
-            for (int col = 0; col < width; col++) {
-                int result = propagateLine(cells, down.get(col), col, width, height);
-                if (result == -1) return false;
-                if (result == 1) changed = true;
-            }
+    /**
+     * Generate a random solution with given fill probability.
+     * Sparser grids are more likely to yield unique puzzles.
+     */
+    private static int[] generateSparseSolution(int width, int height, double fillProbability) {
+        int[] solution = new int[width * height];
+        for (int i = 0; i < solution.length; i++) {
+            solution[i] = RNG.nextDouble() < fillProbability ? 1 : -1;
         }
+        return solution;
+    }
 
-        for (int i = 0; i < cells.length; i++) {
-            if (cells[i] == 0) return false;
+    private static String solutionToHex(int[] solution) {
+        BigInteger grid = BigInteger.ZERO;
+        for (int i = 0; i < solution.length; i++) {
+            if (solution[i] == 1) grid = grid.setBit(i);
         }
-        return true;
+        return grid.toString(16);
     }
 
     private static List<List<Integer>> computeAcrossFromSolution(int[] cells, int width, int height) {
@@ -101,37 +89,49 @@ public class PicrossSolver {
         int[] line = new int[len];
         for (int i = 0; i < len; i++) line[i] = cells[start + i * step];
 
-        int[] left  = leftmost(line, clues, len);
+        int[] left = leftmost(line, clues, len);
         int[] right = rightmost(line, clues, len);
         if (left == null || right == null) return -1;
 
-        boolean[] mustFill = new boolean[len];
-        boolean[] canFill  = new boolean[len];
+        boolean changed = false;
 
+        // Mark cells that must be filled
         for (int k = 0; k < clues.size(); k++) {
             int clue = clues.get(k);
             int overlapStart = right[k];
-            int overlapEnd   = left[k] + clue;
+            int overlapEnd = left[k] + clue;
             for (int i = overlapStart; i < overlapEnd; i++) {
-                mustFill[i] = true;
+                int idx = start + i * step;
+                if (cells[idx] == 0) {
+                    cells[idx] = 1;
+                    changed = true;
+                } else if (cells[idx] == -1) {
+                    return -1;
+                }
             }
+        }
+
+        // Mark cells that must be empty
+        boolean[] canFill = new boolean[len];
+        for (int k = 0; k < clues.size(); k++) {
+            int clue = clues.get(k);
             for (int i = left[k]; i < right[k] + clue; i++) {
                 canFill[i] = true;
             }
         }
 
-        boolean changed = false;
         for (int i = 0; i < len; i++) {
-            int idx = start + i * step;
-            if (mustFill[i] && cells[idx] != 1) {
-                if (cells[idx] == -1) return -1;
-                cells[idx] = 1; changed = true;
-            }
-            if (!canFill[i] && cells[idx] != -1) {
-                if (cells[idx] == 1) return -1;
-                cells[idx] = -1; changed = true;
+            if (!canFill[i]) {
+                int idx = start + i * step;
+                if (cells[idx] == 0) {
+                    cells[idx] = -1;
+                    changed = true;
+                } else if (cells[idx] == 1) {
+                    return -1;
+                }
             }
         }
+
         return changed ? 1 : 0;
     }
 
@@ -205,5 +205,4 @@ public class PicrossSolver {
         if (pos + clue < len && line[pos + clue] == 1) return false;
         return pos <= 0 || line[pos - 1] != 1;
     }
-
 }

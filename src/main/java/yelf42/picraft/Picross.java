@@ -61,6 +61,8 @@ public class Picross {
         this.across = readAcrossEncoding(new BigInteger(encoding, 16), width, height);
         this.down = readDownEncoding(new BigInteger(encoding, 16), width, height);
 
+        //print(new BigInteger(encoding, 16), width, height);
+
         this.correctDown = Arrays.stream(new int[width]).map(i -> 0).toArray();
         this.correctAcross = Arrays.stream(new int[height]).map(i -> 0).toArray();
         this.playGrid = IntStream.range(0, height)
@@ -194,6 +196,8 @@ public class Picross {
 
                 if (td.getScoreboardTags().contains("filled")) {
                     addCell(cell.getLeft(), cell.getRight());
+                } else {
+                    delCell(cell.getLeft(), cell.getRight());
                 }
             }
         });
@@ -205,9 +209,6 @@ public class Picross {
         Pair<Integer, Integer> cell = locationToCell(location);
         Entity entity = this.location.getWorld().getNearbyEntities(location, 1, 1, 1, (e -> e.getType() == EntityType.TEXT_DISPLAY && e.getScoreboardTags().contains(cell.getLeft() + "," + cell.getRight())))
                 .stream().findFirst().orElse(null);
-        if (entity == null) {
-            entity = spawnAnswerDisplay(location.getBlockX(), location.getBlockY(), location.getBlockZ(), cell.getLeft() + "," + cell.getRight(), hit);
-        }
         TextDisplay td = (TextDisplay) entity;
         Component text = Component.text("■");
         if (!hit) {
@@ -225,7 +226,7 @@ public class Picross {
     }
 
     private void addCell(int row, int col) {
-        if (this.playGrid.get(row).get(col) == 1) return;
+        //if (this.playGrid.get(row).get(col) == 1) return;
 
         this.playGrid.get(row).set(col, 1);
         this.correctAcross[row] = checkRow(row) ? 1 : 0;
@@ -235,7 +236,7 @@ public class Picross {
     }
 
     private void delCell(int row, int col) {
-        if (this.playGrid.get(row).get(col) == 0) return;
+        //if (this.playGrid.get(row).get(col) == 0) return;
 
         this.playGrid.get(row).set(col, 0);
         this.correctAcross[row] = checkRow(row) ? 1 : 0;
@@ -253,6 +254,7 @@ public class Picross {
                         entity.addScoreboardTag("locked");
                     } else if (entity instanceof TextDisplay td && td.getScoreboardTags().contains("cell") && td.getScoreboardTags().contains("filled")) {
                         Component text = Component.text("■");
+                        td.setTextOpacity((byte) 255);
                         td.text(text.color(NamedTextColor.DARK_GREEN));
                     }
                 }
@@ -263,37 +265,83 @@ public class Picross {
     }
 
     private boolean checkRow(int row) {
+        List<Integer> clues = this.across.get(row);
+        if (clues.isEmpty()) {
+            return this.playGrid.get(row).stream().noneMatch(c -> c == 1);
+        }
+
         int clueIdx = 0;
         int counter = 0;
         for (int col = 0; col < this.width; col++) {
             if (this.playGrid.get(row).get(col) == 1) {
                 counter++;
-            } else {
-                if (counter > 0) {
-                    if ((clueIdx >= this.across.get(row).size() || counter != this.across.get(row).get(clueIdx++))) return false;
-                    counter = 0;
-                }
+            } else if (counter > 0) {
+                if (clueIdx >= clues.size() || counter != clues.get(clueIdx++)) return false;
+                counter = 0;
             }
         }
-        if (counter > 0 && (clueIdx >= this.across.get(row).size() || counter != this.across.get(row).get(clueIdx++))) return false;
-        return clueIdx == this.across.get(row).size();
+        if (counter > 0 && (clueIdx >= clues.size() || counter != clues.get(clueIdx++))) return false;
+        return clueIdx == clues.size();
     }
 
     private boolean checkCol(int col) {
+        List<Integer> clues = this.down.get(col);
+        if (clues.isEmpty()) {
+            for (int row = 0; row < this.height; row++)
+                if (this.playGrid.get(row).get(col) == 1) return false;
+            return true;
+        }
+
         int clueIdx = 0;
         int counter = 0;
         for (int row = 0; row < this.height; row++) {
             if (this.playGrid.get(row).get(col) == 1) {
                 counter++;
-            } else {
-                if (counter > 0) {
-                    if (clueIdx >= this.down.get(col).size() || counter != this.down.get(col).get(clueIdx++)) return false;
-                    counter = 0;
+            } else if (counter > 0) {
+                if (clueIdx >= clues.size() || counter != clues.get(clueIdx++)) return false;
+                counter = 0;
+            }
+        }
+        if (counter > 0 && (clueIdx >= clues.size() || counter != clues.get(clueIdx++))) return false;
+        return clueIdx == clues.size();
+    }
+
+    public void forceSolve() {
+        if (this.solved) return;
+
+        BigInteger grid = new BigInteger(this.encoding, 16);
+        int[][] comp = new int[this.width][this.height];
+        for (int row = 0; row < height; row++) {
+            for (int col = 0; col < width; col++) {
+                int bitIndex = row * width + col;
+                if (grid.testBit(bitIndex)) {
+                    comp[row][col] = 1;
+                } else {
+                    comp[row][col] = 0;
                 }
             }
         }
-        if (counter > 0 && (clueIdx >= this.down.get(col).size() || counter != this.down.get(col).get(clueIdx++))) return false;
-        return clueIdx == this.down.get(col).size();
+
+        this.location.getWorld().getNearbyEntities(this.boundingBox.clone().expand(1,0,1)).forEach(entity -> {
+            if (entity.getScoreboardTags().contains(this.tag)) {
+                if (entity.getType() == EntityType.INTERACTION) {
+                    entity.addScoreboardTag("locked");
+                } else if (entity instanceof TextDisplay td && td.getScoreboardTags().contains("cell")) {
+                    Component text = Component.text("■");
+                    Pair<Integer, Integer> cell = locationToCell(entity.getLocation());
+                    if (comp[cell.getLeft()][cell.getRight()] == 1) {
+                        td.text(text.color(NamedTextColor.DARK_RED));
+                        td.setTextOpacity((byte) 255);
+                        td.addScoreboardTag("filled");
+                    } else {
+                        td.text(text.color(TextColor.color(0x6c898c)));
+                        td.setTextOpacity((byte) 100);
+                        td.removeScoreboardTag("filled");
+                    }
+                }
+            }
+        });
+        this.solved = true;
     }
 
     // Starts the 3-tick update loop
@@ -375,7 +423,7 @@ public class Picross {
     }
 
     public boolean overlappingBoundingBox(BoundingBox bb, World world) {
-        return this.boundingBox.overlaps(bb.expand(2)) && this.location.getWorld() == world;
+        return this.boundingBox.overlaps(bb.clone().expand(2)) && this.location.getWorld() == world;
     }
 
     public void removeTextDisplays() {
@@ -454,6 +502,8 @@ public class Picross {
         interaction.setResponsive(true);
         interaction.addScoreboardTag(this.tag);
         interaction.addScoreboardTag("picraft");
+
+        spawnAnswerDisplay(location.getBlockX(), location.getBlockY(), location.getBlockZ());
     }
 
     private static final Transformation TRANSFORM_A = new Transformation(
@@ -463,10 +513,12 @@ public class Picross {
             new AxisAngle4f(0, 0, 0, 1)
     );
 
-    public Entity spawnAnswerDisplay(float x, float y, float z, String cell, boolean hit) {
+    public void spawnAnswerDisplay(float x, float y, float z) {
         Location location = new Location(this.location.getWorld(), x, y, z);
-        return this.location.getWorld().spawn(location, TextDisplay.class, display -> {
-            display.text(Component.text("■").color(hit ? TextColor.color(0x6c898c) : TextColor.color(0x00b7c9)));
+        Pair<Integer, Integer> cell = locationToCell(location);
+        this.location.getWorld().spawn(location, TextDisplay.class, display -> {
+            display.text(Component.text("■").color(NamedTextColor.WHITE));
+            display.setTextOpacity((byte) 0);
             display.setAlignment(TextDisplay.TextAlignment.CENTER);
             display.setDefaultBackground(false);
             display.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
@@ -478,9 +530,7 @@ public class Picross {
             display.addScoreboardTag(this.tag);
             display.addScoreboardTag("picraft");
             display.addScoreboardTag("cell");
-            display.addScoreboardTag(cell);
-            if (!hit) display.addScoreboardTag("filled");
-            if (hit) display.setTextOpacity((byte) 100);
+            display.addScoreboardTag(cell.getLeft() + "," + cell.getRight());
             display.setPersistent(true);
         });
     }
