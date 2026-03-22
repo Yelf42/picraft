@@ -34,14 +34,14 @@ public class Picross {
     private final List<List<Integer>> down;
 
     private final List<List<Integer>> playGrid;
-    private int[] correctDown;
-    private int[] correctAcross;
+    private final int[] correctDown;
+    private final int[] correctAcross;
     private boolean solved = false;
 
     private final UUID id;
     private final String tag;
 
-    private BoundingBox boundingBox;
+    private final BoundingBox boundingBox;
 
     public Picross(int width, int height, String encoding, Location location, UUID id, boolean solved) {
         this(width, height, encoding, location, id);

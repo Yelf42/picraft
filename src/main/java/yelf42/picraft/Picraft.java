@@ -224,12 +224,52 @@ public final class Picraft extends JavaPlugin {
                                                 }))))))
                 .build();
 
+        LiteralCommandNode<CommandSourceStack> buildRepeat = Commands.literal("buildRepeat").requires(sender -> sender.getSender().isOp())
+                .then(Commands.argument("dimension", ArgumentTypes.world())
+                        .then(Commands.argument("pos", ArgumentTypes.blockPosition())
+                                                .executes(ctx -> {
+                                                    CommandSender sender = ctx.getSource().getSender();
+
+                                                    World world = ctx.getArgument("dimension", World.class);
+                                                    BlockPositionResolver posResolver = ctx.getArgument("pos", BlockPositionResolver.class);
+                                                    BlockPosition position = posResolver.resolve(ctx.getSource());
+                                                    Location location = new Location(world, position.x(), position.y(), position.z());
+
+                                                    if (activePlacements.isEmpty()) {
+                                                        sender.sendMessage(Component.text("No nonogram to repeat, cancelling build"));
+                                                        return Command.SINGLE_SUCCESS;
+                                                    }
+
+                                                    String encoding = activePlacements.getLast().getEncoding();
+                                                    int width = activePlacements.getLast().getWidth();
+                                                    int height = activePlacements.getLast().getHeight();
+
+                                                    if (checkPlacementOverlap(new BoundingBox(location.getBlockX(), location.getBlockY() - 2, location.getBlockZ(),
+                                                            location.getBlockX() + width, location.getBlockY() + 3, location.getBlockZ() + height), world)) {
+                                                        sender.sendMessage(Component.text("Overlaps existing placement, cancelling build"));
+                                                        return Command.SINGLE_SUCCESS;
+                                                    }
+
+                                                    Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+                                                        Bukkit.getScheduler().runTask(this, () -> {
+                                                            Picross placement = new Picross(width, height, encoding, location);
+                                                            activePlacements.add(placement);
+                                                            placement.startTicking(this);
+                                                            placement.generate();
+                                                            sender.sendMessage(Component.text("Puzzle ready! Encoding: " + encoding));
+                                                        });
+                                                    });
+
+                                                    return Command.SINGLE_SUCCESS;
+                                                })))
+                .build();
 
         this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, commands -> {
             commands.registrar().register(remove);
             commands.registrar().register(buildUnique);
             commands.registrar().register(buildRandom);
             commands.registrar().register(buildExisting);
+            commands.registrar().register(buildRepeat);
         });
     }
 

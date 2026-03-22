@@ -203,8 +203,7 @@ public class PicrossSolver {
             if (line[i] == -1) return false;
         }
         if (pos + clue < len && line[pos + clue] == 1) return false;
-        if (pos > 0 && line[pos - 1] == 1) return false;
-        return true;
+        return pos <= 0 || line[pos - 1] != 1;
     }
 
 }

@@ -9,7 +9,6 @@ Very fast, but will likely create a nonogram with multiple solutions. </br>
 The nonogram will be considered solved if any solution is input, </br>
 but these problems can be more tedious to try solve.
 
-
 ``/picraft:buildUnique dimension x y z width height``</br>
 Creates a new random nonogram with width * height at the dimension and location. </br>
 Quite slow, but creates a nonogram with a unique solution. </br>
@@ -21,7 +20,10 @@ Very fast, but the existence of multiple solutions depends on using a good encod
 Encodings are strings that represent the solution in hexidecimal. </br>
 ``buildRandom`` and ``buildUnique`` will output the encoding they create, but you can also generate an encoding using [this p5.js project](https://editor.p5js.org/Yelf/sketches/8-t1V3A9n)
 
-If you want to set up multiple copies of the same nonogram, say for competition, you should run ``buildUnique`` first and then supply the outputted encoding to ``buildExisting``
+``/picraft:buildRepeat dimension x y z``</br>
+Creates a copy of the last nonogram created </br>
+Very fast, ideal for repeating a `buildRandom` for competitions etc </br>
+
 
 ## Credits
 [Nonogram-Maker by kniffen](https://github.com/kniffen/Nonogram-Maker?tab=readme-ov-file)
